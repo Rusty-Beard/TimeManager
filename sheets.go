@@ -34,24 +34,25 @@ func initSheets() (*sheets.Service, error) {
 }
 
 func createSheetTitle(title, id string) string {
-	return title+" ("+id+")"
+	return title + " (" + id + ")"
 }
 
 func addSheet(rec Record) error {
 	var vr sheets.ValueRange
-	var Values []interface{}
+	vr.Values = make([][]interface{}, 1)
 	if rec.Date != "" {
 		vr.Values[0] = make([]interface{}, 11)
 		vr.Values[0][8] = rec.Date
 	} else {
+		var Values []interface{}
 		Values = append(Values, time.Now().In(loc).Format("02.01.2006 15:04:05"), rec.Name, rec.FirstHash, rec.Description, rec.Link, nil, rec.EndTime, nil, nil, rec.SecondHash, rec.TaskNumber)
-		vr.Values = append(vr.Values, Values)
+		vr.Values[0] = Values
 	}
 
 	req := sheets.Request{
 		AddSheet: &sheets.AddSheetRequest{
 			Properties: &sheets.SheetProperties{
-				Title: createSheetTitle(rec.Chat,rec.ChatId),
+				Title: createSheetTitle(rec.Chat, rec.ChatId),
 			},
 		},
 	}
@@ -64,7 +65,7 @@ func addSheet(rec Record) error {
 	if err != nil {
 		return &advError{Op: "sendRecord", desc: "Не удалось создать таблицу", Err: err}
 	}
-	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, createSheetTitle(rec.Chat,rec.ChatId), &vr).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, createSheetTitle(rec.Chat, rec.ChatId), &vr).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		return &advError{Op: "sendRecord", desc: "Не удалось добавить значения в новую таблицу", Err: err}
 	}
@@ -73,9 +74,9 @@ func addSheet(rec Record) error {
 
 func sendRecord(rec Record) error {
 	var vr sheets.ValueRange
-	var Values []interface{}
+	vr.Values = make([][]interface{}, 2)
 
-	vr1, err := srv.Spreadsheets.Values.Get(cfg.sheetId, createSheetTitle(rec.Chat,rec.ChatId)).Do()
+	vr1, err := srv.Spreadsheets.Values.Get(cfg.sheetId, createSheetTitle(rec.Chat, rec.ChatId)).Do()
 	if err != nil {
 		switch err.(type) {
 		case *googleapi.Error:
@@ -91,12 +92,13 @@ func sendRecord(rec Record) error {
 
 	if rec.Date != "" {
 		vr.Values[0] = make([]interface{}, 11)
-		vr.Values = append(vr.Values, make([]interface{}, 11))
+		vr.Values[1] = make([]interface{}, 11)
 		vr.Values[1][8] = rec.Date
 	} else {
+		var Values []interface{}
 		idx := strconv.Itoa(len(vr1.Values) + 1)
-		Values = append(Values, time.Now().In(loc).Format("02.01.2006 15:04:05"), rec.Name, rec.FirstHash, rec.Description, rec.Link, nil, rec.EndTime, "=G" + idx + "-F" + idx + "+(F" + idx + ">G" + idx + ")", nil, rec.SecondHash, rec.TaskNumber)
-		vr.Values = append(vr.Values, Values)
+		Values = append(Values, time.Now().In(loc).Format("02.01.2006 15:04:05"), rec.Name, rec.FirstHash, rec.Description, rec.Link, nil, rec.EndTime, "=G"+idx+"-F"+idx+"+(F"+idx+">G"+idx+")", nil, rec.SecondHash, rec.TaskNumber)
+		vr.Values[0] = Values
 
 		if len(vr1.Values[len(vr1.Values)-1]) > 6 {
 			vr.Values[0][5] = vr1.Values[len(vr1.Values)-1][6]
@@ -111,7 +113,7 @@ func sendRecord(rec Record) error {
 		}
 	}
 
-	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, createSheetTitle(rec.Chat,rec.ChatId)+"!A"+strconv.Itoa(len(vr1.Values)+1), &vr).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, createSheetTitle(rec.Chat, rec.ChatId)+"!A"+strconv.Itoa(len(vr1.Values)+1), &vr).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		return &advError{Op: "sendRecord", desc: "Не удалось добавить значения в таблицу", Err: err}
 	}

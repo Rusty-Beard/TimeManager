@@ -14,6 +14,7 @@ var summaryExpr = regexp.MustCompile(`(?i)^# ?сводка(?: (\d\d[.,]\d\d[.,])
 var recordExpr = regexp.MustCompile(`(?si-m)^(?:# ?([а-яa-z0-9ё_\-]+) +(\d{1,2}[:.,]\d{2})[ \n]+(?:# ?([а-яa-z0-9ё_\-]+)[ \n]?(?:(\d+(?:\.\d+)*)[ \n]?)?)?(.*?)$|# ?дата ((?:0?[1-9]|1\d|2\d|3[0,1])[.,](?:0?[1-9]|1[012])[.,])(?:(\d\d)$|\d\d(\d\d)$))`)
 var financeExpr = regexp.MustCompile(`(?si)^# ?(доход|расход) (\d+) (?:# ?([^ \n]+))?(?: (.*))?$`)
 var importantExpr = regexp.MustCompile(`(?si)^(# ?важный ?вопрос) ([^#]*)(?: (#?.*) (https?://.*))?$`)
+
 const success = "Запись создана."
 const fail = "Что-то пошло не так."
 

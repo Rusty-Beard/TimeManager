@@ -4,7 +4,6 @@ import (
 	"context"
 	tg "github.com/go-telegram-bot-api/telegram-bot-api"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 	"io/ioutil"
@@ -35,6 +34,19 @@ func initSheets() (*sheets.Service, error) {
 
 func createSheetTitle(title, id string) string {
 	return title + " (" + id + ")"
+}
+
+func findSheetName(chatId string) (string, int64, error) {
+	resp, err := srv.Spreadsheets.Get(cfg.sheetId).Do()
+	if err != nil {
+		return "", 0, err
+	}
+	for _, sheet := range resp.Sheets {
+		if strings.Contains(sheet.Properties.Title, chatId) {
+			return sheet.Properties.Title, sheet.Properties.SheetId, nil
+		}
+	}
+	return "", 0, nil
 }
 
 func addSheet(rec Record) error {
@@ -75,19 +87,17 @@ func addSheet(rec Record) error {
 func sendRecord(rec Record) error {
 	var vr sheets.ValueRange
 	vr.Values = make([][]interface{}, 2)
-
-	vr1, err := srv.Spreadsheets.Values.Get(cfg.sheetId, createSheetTitle(rec.Chat, rec.ChatId)).Do()
+	title, id, err := findSheetName(rec.ChatId)
 	if err != nil {
-		switch err.(type) {
-		case *googleapi.Error:
-			if strings.Contains(err.(*googleapi.Error).Message, "Unable to parse range") {
-				return addSheet(rec)
-			} else {
-				return &advError{Op: "sendRecord", desc: "Не обрабатываемая ошибка gApi", Err: err}
-			}
-		default:
-			return &advError{Op: "sendRecord", desc: "Ошибка при получении данных из gSheets", Err: err}
-		}
+		return &advError{Op: "sendRecord", desc: "Ошибка при получении страниц", Err: err}
+	}
+	if title == "" {
+		return addSheet(rec)
+	}
+
+	vr1, err := srv.Spreadsheets.Values.Get(cfg.sheetId, title).Do()
+	if err != nil {
+		return &advError{Op: "sendRecord", desc: "Ошибка при получении данных из gSheets", Err: err}
 	}
 
 	if rec.Date != "" {
@@ -113,9 +123,27 @@ func sendRecord(rec Record) error {
 		}
 	}
 
-	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, createSheetTitle(rec.Chat, rec.ChatId)+"!A"+strconv.Itoa(len(vr1.Values)+1), &vr).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Append(cfg.sheetId, title+"!A"+strconv.Itoa(len(vr1.Values)+1), &vr).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		return &advError{Op: "sendRecord", desc: "Не удалось добавить значения в таблицу", Err: err}
+	}
+
+	if title != createSheetTitle(rec.Chat, rec.ChatId) {
+		renameRequest := sheets.Request{
+			UpdateSheetProperties: &sheets.UpdateSheetPropertiesRequest{
+				Properties: &sheets.SheetProperties{Title: createSheetTitle(rec.Chat, rec.ChatId), SheetId: id},
+				Fields:     "title",
+			},
+		}
+
+		rbb := &sheets.BatchUpdateSpreadsheetRequest{
+			Requests: []*sheets.Request{&renameRequest},
+		}
+
+		_, err := srv.Spreadsheets.BatchUpdate(cfg.sheetId, rbb).Context(context.Background()).Do()
+		if err != nil {
+			return &advError{Op: "sendRecord", desc: "Не удалось обновить имя таблицы", Err: err}
+		}
 	}
 
 	return nil

@@ -14,6 +14,9 @@ var summaryExpr = regexp.MustCompile(`(?i)^# ?сводка(?: (\d\d[.,]\d\d[.,])
 var recordExpr = regexp.MustCompile(`(?si-m)^(?:# ?([а-яa-z0-9ё_\-]+) +(\d{1,2}[:.,]\d{2})[ \n]+(?:# ?([а-яa-z0-9ё_\-]+)[ \n]?(?:(\d+(?:\.\d+)*)[ \n]?)?)?(.*?)$|# ?дата ((?:0?[1-9]|1\d|2\d|3[0,1])[.,](?:0?[1-9]|1[012])[.,])(?:(\d\d)$|\d\d(\d\d)$))`)
 var financeExpr = regexp.MustCompile(`(?si)^# ?(доход|расход) (\d+) (?:# ?([^ \n]+))?(?: (.*))?$`)
 var importantExpr = regexp.MustCompile(`(?si)^(# ?важный ?вопрос) ([^#]*)(?: (#?.*) (https?://.*))?$`)
+var (
+	sendMentionsExpr = regexp.MustCompile(`(?si)^#((\d\d[.,]\d\d[.,])(?:(\d\d)|\d\d(\d\d))) (@[^\s]+)$`)
+)
 
 const success = "Запись создана."
 const fail = "Что-то пошло не так."
@@ -75,6 +78,11 @@ func Messages(msg *tg.Message) {
 		return
 	}
 	if strings.Contains(msg.Text, "@") {
+		skip := sendMentionsExpr.FindStringSubmatch(msg.Text)
+		if skip != nil {
+			commandWrapper(msg.Chat.ID, "sendMentions error, ", sendMentions(msg.Chat.ID, skip[1], skip[5]), false)
+			return
+		}
 		commandWrapper(msg.Chat.ID, "mentions error ,", mentions(msg.Chat.Title, makeLink(msg), msg.Text), true)
 	}
 	if int64(msg.From.ID) == cfg.admin {

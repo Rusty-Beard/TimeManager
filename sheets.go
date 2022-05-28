@@ -267,3 +267,38 @@ func mentions(chat, link, message string) error {
 	_, err := srv.Spreadsheets.Values.Append(cfg.sheetId, "УПОМИНАНИЯ", &vr).ValueInputOption("USER_ENTERED").Do()
 	return err
 }
+
+func sendMentions(chat int64, date, mention string) error {
+	valueRange, err := srv.Spreadsheets.Values.Get(cfg.sheetId, "УПОМИНАНИЯ").Do()
+	if err != nil {
+		return err
+	}
+	var entries [][]interface{}
+	for _, entry := range valueRange.Values {
+		if len(entry) < 4 {
+			continue
+		}
+		entryDateTime := strings.Split(entry[0].(string), " ")
+		if len(entryDateTime) < 2 {
+			continue
+		}
+		if dateMatch(entryDateTime[0], date) && strings.Contains(entry[3].(string), mention) {
+			entries = append(entries, entry)
+		}
+	}
+
+	for _, entry := range entries {
+		text := entry[2].(string) + "\n" + entry[3].(string)
+		OutBox <- tg.NewMessage(chat, text)
+	}
+	return nil
+}
+func dateMatch(fullDate, input string) bool {
+	dmy1 := strings.Split(input, ".")
+	dmy2 := strings.Split(fullDate, ".")
+	if len(dmy2) < 3 || len(dmy1) < 3 || len(dmy1) != len(dmy2) {
+		return false
+	}
+	return dmy1[0] == dmy2[0] && dmy1[1] == dmy2[1] && (dmy1[2] == dmy2[2] || strings.HasSuffix(dmy2[2], dmy1[2]))
+
+}
